@@ -84,6 +84,17 @@ export async function exportToExcel(
     const isZero = typeof v === "number" && v === 0;
 
     if (!ws[cellRef]) ws[cellRef] = {};
+    
+    // Set proper cell type
+    const val = v as any;
+    if (isDateCol && val instanceof Date) {
+      ws[cellRef].t = "d";
+    } else if (typeof val === "number") {
+      ws[cellRef].t = "n";
+    } else {
+      ws[cellRef].t = "s";
+    }
+    
     ws[cellRef].s = {
       font: {
         name: "Segoe UI",

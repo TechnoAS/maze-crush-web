@@ -224,6 +224,14 @@ export async function buildAppendedBuffer(
             },
           };
         } else {
+          // Set proper cell type for data rows
+          if (h === "Date" && v instanceof Date) {
+            ws[cellRef].t = "d";
+          } else if (typeof v === "number") {
+            ws[cellRef].t = "n";
+          } else {
+            ws[cellRef].t = "s";
+          }
           ws[cellRef].s = styleCell({}, bg, h, v);
         }
       }
