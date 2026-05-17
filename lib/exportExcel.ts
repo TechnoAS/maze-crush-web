@@ -108,7 +108,8 @@ export async function exportToExcel(
 
   // ── Set column widths ────────────────────────────────────────────────────────
   ws["!cols"] = headers.map((h, i) => {
-    const valLen = String(rowValues[i] instanceof Date ? rowValues[i].toLocaleString() : rowValues[i]).length;
+    const val = rowValues[i] as any;
+    const valLen = String(val instanceof Date ? val.toLocaleString() : val).length;
     return { wch: Math.max(h.length + 3, valLen + 2, 14) };
   });
 

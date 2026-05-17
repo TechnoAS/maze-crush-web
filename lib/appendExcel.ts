@@ -105,7 +105,7 @@ export async function buildAppendedBuffer(
     wb = read(existingBuffer, { type: "array" });
     if (wb.SheetNames.includes(sheetName)) {
       ws = wb.Sheets[sheetName];
-      const aoa = utils.sheet_to_aoa(ws);
+      const aoa = (utils as any).sheet_to_aoa(ws);
       if (aoa && aoa.length > 0) {
         headers = aoa[0] as string[];
       }
@@ -157,7 +157,7 @@ export async function buildAppendedBuffer(
 
   // Duplicate check
   const todayStr = String(data["Date"] ?? "").trim();
-  let aoa = utils.sheet_to_aoa(ws);
+  let aoa = (utils as any).sheet_to_aoa(ws);
   const dateIdx = headers.indexOf("Date");
 
   if (todayStr && dateIdx >= 0 && aoa && aoa.length > 1) {
@@ -187,7 +187,7 @@ export async function buildAppendedBuffer(
     if (dateIdx >= 0 && aoa.length > 2) {
       const header = aoa[0];
       const rows = aoa.slice(1);
-      rows.sort((a, b) => {
+      rows.sort((a: any[], b: any[]) => {
         const da = a[dateIdx] instanceof Date ? (a[dateIdx] as Date) : parseDateStr(String(a[dateIdx] ?? ""));
         const db = b[dateIdx] instanceof Date ? (b[dateIdx] as Date) : parseDateStr(String(b[dateIdx] ?? ""));
         if (!da && !db) return 0;
@@ -232,7 +232,7 @@ export async function buildAppendedBuffer(
 
   // Set column widths
   ws["!cols"] = headers.map((h, i) => {
-    const aoa = utils.sheet_to_aoa(ws);
+    const aoa = (utils as any).sheet_to_aoa(ws);
     let w = h.length + 3;
     if (aoa) {
       for (let r = 1; r < aoa.length; r++) {
@@ -245,7 +245,7 @@ export async function buildAppendedBuffer(
   });
 
   // Set row heights
-  aoa = utils.sheet_to_aoa(ws);
+  aoa = (utils as any).sheet_to_aoa(ws);
   ws["!rows"] = [];
   if (aoa) {
     ws["!rows"][0] = { hpx: 40 };
