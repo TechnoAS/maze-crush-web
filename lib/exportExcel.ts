@@ -4,7 +4,7 @@
  * Modern Microsoft Office 365 Design
  */
 
-import { utils, write } from "xlsx";
+import * as XLSX from "xlsx-js-style";
 import { saveAs } from "file-saver";
 import type { ParsedReport } from "./parser";
 
@@ -52,18 +52,16 @@ export async function exportToExcel(
   });
 
   // Create worksheet with headers and data
-  const ws = utils.aoa_to_sheet([headers, rowValues]);
+  const ws = XLSX.utils.aoa_to_sheet([headers, rowValues]);
 
   // ── Style header row ─────────────────────────────────────────────────────────
   for (let c = 0; c < headers.length; c++) {
-    const cellRef = utils.encode_cell({ r: 0, c });
+    const cellRef = XLSX.utils.encode_cell({ r: 0, c });
     if (!ws[cellRef]) ws[cellRef] = {};
-    // Preserve value and add styling
     ws[cellRef].v = ws[cellRef].v || headers[c];
-    ws[cellRef].t = "s";
     ws[cellRef].s = {
       font: { bold: true, color: { rgb: HEADER_FG }, name: "Segoe UI", sz: 11 },
-      fill: { patternType: "solid", fgColor: { rgb: HEADER_BG }, theme: undefined, tint: undefined },
+      fill: { patternType: "solid", fgColor: { rgb: HEADER_BG } },
       alignment: { horizontal: "center", vertical: "middle", wrapText: true },
       border: {
         left: { style: "thin", color: { rgb: "D0D0D0" } },
@@ -76,7 +74,7 @@ export async function exportToExcel(
 
   // ── Style data row ───────────────────────────────────────────────────────────
   for (let c = 0; c < headers.length; c++) {
-    const cellRef = utils.encode_cell({ r: 1, c });
+    const cellRef = XLSX.utils.encode_cell({ r: 1, c });
     const h = headers[c];
     const v = rowValues[c];
     const isDateCol = h === "Date";
@@ -84,16 +82,6 @@ export async function exportToExcel(
     const isZero = typeof v === "number" && v === 0;
 
     if (!ws[cellRef]) ws[cellRef] = {};
-    
-    // Set proper cell type
-    const val = v as any;
-    if (isDateCol && val instanceof Date) {
-      ws[cellRef].t = "d";
-    } else if (typeof val === "number") {
-      ws[cellRef].t = "n";
-    } else {
-      ws[cellRef].t = "s";
-    }
     
     ws[cellRef].s = {
       font: {
@@ -105,7 +93,7 @@ export async function exportToExcel(
         },
         italic: typeof v === "string" && v !== "",
       },
-      fill: { patternType: "solid", fgColor: { rgb: ROW_ODD }, theme: undefined, tint: undefined },
+      fill: { patternType: "solid", fgColor: { rgb: ROW_ODD } },
       alignment: { horizontal: "center", vertical: "middle", wrapText: true },
       border: {
         left: { style: "thin", color: { rgb: "D0D0D0" } },
@@ -113,8 +101,18 @@ export async function exportToExcel(
         top: { style: "thin", color: { rgb: "D0D0D0" } },
         bottom: { style: "thin", color: { rgb: "D0D0D0" } },
       },
-      numFmt: isDateCol ? "DD/MM/YYYY" : isPercentCol ? "0.00%" : typeof v === "number" ? "#,##0.000" : "@",
     };
+    
+    // Set number format
+    if (isDateCol) {
+      ws[cellRef].z = "DD/MM/YYYY";
+    } else if (isPercentCol) {
+      ws[cellRef].z = "0.00%";
+    } else if (typeof v === "number") {
+      ws[cellRef].z = "#,##0.000";
+    } else {
+      ws[cellRef].z = "@";
+    }
   }
 
   // ── Set column widths ────────────────────────────────────────────────────────
@@ -131,11 +129,17 @@ export async function exportToExcel(
   ];
 
   // ── Freeze panes ─────────────────────────────────────────────────────────────
-  ws["!freeze"] = { xSplit: 1, ySplit: 1 };
+  ws["!freeze"] = {
+    xSplit: 1,
+    ySplit: 1,
+    topLeftCell: "B2",
+    activePane: "bottomRight",
+    state: "frozen",
+  };
 
   // ── Create workbook ─────────────────────────────────────────────────────────
-  const wb = utils.book_new();
-  utils.book_append_sheet(wb, ws, sheetName);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
 
   // ── Set sheet tab color (Modern Office Blue) ─────────────────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -144,7 +148,7 @@ export async function exportToExcel(
   }
 
   // ── Generate XLSX buffer and download ────────────────────────────────────────
-  const buffer = write(wb, { bookType: "xlsx", type: "array" });
+  const buffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
   const blob = new Blob([buffer], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });

@@ -4,7 +4,7 @@
  * Modern Microsoft Office 365 Design
  */
 
-import { read, utils, write } from "xlsx";
+import * as XLSX from "xlsx-js-style";
 import { saveAs } from "file-saver";
 import type { ParsedReport } from "./parser";
 
@@ -38,7 +38,7 @@ function styleCell(s: any, bg: string, h: string, v: any) {
   const isPercentCol = h.includes("%");
   const isZero = typeof v === "number" && v === 0;
 
-  s.fill = { patternType: "solid", fgColor: { rgb: bg }, theme: undefined, tint: undefined };
+  s.fill = { patternType: "solid", fgColor: { rgb: bg } };
   s.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
   s.border = {
     left: { style: "thin", color: { rgb: "D0D0D0" } },
@@ -80,7 +80,7 @@ export async function pickExcelFile(): Promise<{ handle: FileSystemFileHandle; b
 }
 
 export async function getSheetNames(buffer: ArrayBuffer): Promise<string[]> {
-  const wb = read(buffer, { type: "array" });
+  const wb = XLSX.read(buffer, { type: "array" });
   return wb.SheetNames;
 }
 
@@ -102,19 +102,19 @@ export async function buildAppendedBuffer(
   let duplicate = false;
 
   if (existingBuffer) {
-    wb = read(existingBuffer, { type: "array" });
+    wb = XLSX.read(existingBuffer, { type: "array" });
     if (wb.SheetNames.includes(sheetName)) {
       ws = wb.Sheets[sheetName];
-      const aoa = (utils as any).sheet_to_aoa(ws);
+      const aoa = (XLSX.utils as any).sheet_to_aoa(ws);
       if (aoa && aoa.length > 0) {
         headers = aoa[0] as string[];
       }
     } else {
-      ws = utils.aoa_to_sheet([]);
+      ws = XLSX.utils.aoa_to_sheet([]);
     }
   } else {
-    wb = utils.book_new();
-    ws = utils.aoa_to_sheet([]);
+    wb = XLSX.utils.book_new();
+    ws = XLSX.utils.aoa_to_sheet([]);
   }
 
   const incoming = Object.keys(data);
@@ -135,15 +135,14 @@ export async function buildAppendedBuffer(
   if (!existingBuffer || !wb.SheetNames.includes(sheetName)) {
     const headerRow = headers.map(h => h);
     const headerAoa = [headerRow];
-    ws = utils.aoa_to_sheet(headerAoa);
+    ws = XLSX.utils.aoa_to_sheet(headerAoa);
     for (let c = 0; c < headers.length; c++) {
-      const cellRef = utils.encode_cell({ r: 0, c });
+      const cellRef = XLSX.utils.encode_cell({ r: 0, c });
       if (!ws[cellRef]) ws[cellRef] = {};
       ws[cellRef].v = ws[cellRef].v || headers[c];
-      ws[cellRef].t = "s";
       ws[cellRef].s = {
         font: { bold: true, color: { rgb: HEADER_FG }, name: "Segoe UI", sz: 11 },
-        fill: { patternType: "solid", fgColor: { rgb: HEADER_BG }, theme: undefined, tint: undefined },
+        fill: { patternType: "solid", fgColor: { rgb: HEADER_BG } },
         alignment: { horizontal: "center", vertical: "middle", wrapText: true },
         border: {
           left: { style: "thin", color: { rgb: "D0D0D0" } },
@@ -157,7 +156,7 @@ export async function buildAppendedBuffer(
 
   // Duplicate check
   const todayStr = String(data["Date"] ?? "").trim();
-  let aoa = (utils as any).sheet_to_aoa(ws);
+  let aoa = (XLSX.utils as any).sheet_to_aoa(ws);
   const dateIdx = headers.indexOf("Date");
 
   if (todayStr && dateIdx >= 0 && aoa && aoa.length > 1) {
@@ -198,12 +197,12 @@ export async function buildAppendedBuffer(
       aoa = [header, ...rows];
     }
 
-    ws = utils.aoa_to_sheet(aoa);
+    ws = XLSX.utils.aoa_to_sheet(aoa);
 
     // Style all rows
     for (let r = 0; r < aoa.length; r++) {
       for (let c = 0; c < headers.length; c++) {
-        const cellRef = utils.encode_cell({ r, c });
+        const cellRef = XLSX.utils.encode_cell({ r, c });
         const v = aoa[r]?.[c];
         const h = headers[c];
         const bg = r === 0 ? HEADER_BG : r % 2 === 0 ? ROW_EVEN : ROW_ODD;
@@ -224,13 +223,15 @@ export async function buildAppendedBuffer(
             },
           };
         } else {
-          // Set proper cell type for data rows
-          if (h === "Date" && v instanceof Date) {
-            ws[cellRef].t = "d";
+          // Set proper cell format for data rows
+          if (h === "Date") {
+            ws[cellRef].z = "DD/MM/YYYY";
+          } else if (h.includes("%")) {
+            ws[cellRef].z = "0.00%";
           } else if (typeof v === "number") {
-            ws[cellRef].t = "n";
+            ws[cellRef].z = "#,##0.000";
           } else {
-            ws[cellRef].t = "s";
+            ws[cellRef].z = "@";
           }
           ws[cellRef].s = styleCell({}, bg, h, v);
         }
@@ -240,7 +241,7 @@ export async function buildAppendedBuffer(
 
   // Set column widths
   ws["!cols"] = headers.map((h, i) => {
-    const aoa = (utils as any).sheet_to_aoa(ws);
+    const aoa = (XLSX.utils as any).sheet_to_aoa(ws);
     let w = h.length + 3;
     if (aoa) {
       for (let r = 1; r < aoa.length; r++) {
@@ -253,7 +254,7 @@ export async function buildAppendedBuffer(
   });
 
   // Set row heights
-  aoa = (utils as any).sheet_to_aoa(ws);
+  aoa = (XLSX.utils as any).sheet_to_aoa(ws);
   ws["!rows"] = [];
   if (aoa) {
     ws["!rows"][0] = { hpx: 40 };
@@ -263,11 +264,17 @@ export async function buildAppendedBuffer(
   }
 
   // Freeze panes
-  ws["!freeze"] = { xSplit: 1, ySplit: 1 };
+  ws["!freeze"] = {
+    xSplit: 1,
+    ySplit: 1,
+    topLeftCell: "B2",
+    activePane: "bottomRight",
+    state: "frozen",
+  };
 
   // Add or update sheet in workbook
   if (!wb.SheetNames.includes(sheetName)) {
-    utils.book_append_sheet(wb, ws, sheetName);
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
   } else {
     wb.Sheets[sheetName] = ws;
   }
@@ -278,7 +285,7 @@ export async function buildAppendedBuffer(
     wb.sheets[idx].tabColor = { rgb: "0078D4" };
   }
 
-  const buffer = write(wb, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
+  const buffer = XLSX.write(wb, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
   const totalRows = Math.max(0, (aoa?.length ?? 1) - 1);
 
   return {
